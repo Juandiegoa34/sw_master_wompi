@@ -1,0 +1,3 @@
+-- ARCHIVO OBSOLETO — las tablas profile_views, contact_clicks y la columna
+-- business_profiles.stats_token ya existen en la base de datos.
+-- Ver tracking_retention.sql para el script de mantenimiento que sí se necesita correr.
