@@ -15,7 +15,7 @@ function ConfirmacionContent() {
     async function processPayment() {
       // Wompi redirige con ?id=<transaction_id>&... y añadimos ?applicationId=<id>
       const wompiTransactionId = searchParams.get('id')
-      const wompiStatus = searchParams.get('approval_status') ?? 'completed'
+      const wompiStatus = searchParams.get('approval_status') ?? 'unknown'
       const applicationId = searchParams.get('applicationId')
 
       if (!applicationId || !wompiTransactionId) {

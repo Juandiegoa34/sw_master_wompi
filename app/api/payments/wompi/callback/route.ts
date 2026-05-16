@@ -6,8 +6,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const applicationId = String(body.applicationId || body.reference || '')
     const wompiReference = String(body.wompi_reference || body.wompiReference || body.id || '')
-    const wompiStatus = String(body.wompi_status || body.wompiStatus || body.approval_status || 'completed')
+    const wompiStatus = String(body.wompi_status || body.wompiStatus || body.approval_status || 'unknown')
     const paymentCompletedAt = body.payment_completed_at || new Date().toISOString()
+
+    const normalizedWompiStatus = wompiStatus.toLowerCase()
+    const isPaid = ['approved', 'completed', 'paid', 'success'].includes(normalizedWompiStatus)
+    const applicationStatus = isPaid ? 'aprobado' : 'pendiente'
+    const transactionStatus = isPaid ? 'paid' : 'failed'
 
     if (!applicationId || !wompiReference) {
       return NextResponse.json({ success: false, message: 'applicationId y wompi_reference requeridos' }, { status: 400 })
@@ -16,7 +21,12 @@ export async function POST(request: NextRequest) {
     // 1) Actualizar applications con referencia y estado
     const { error: errApp } = await supabaseAdmin
       .from('applications')
-      .update({ wompi_reference: wompiReference, wompi_status: wompiStatus, payment_completed_at: paymentCompletedAt, status: 'aprobado' })
+      .update({
+        wompi_reference: wompiReference,
+        wompi_status: wompiStatus,
+        payment_completed_at: isPaid ? paymentCompletedAt : null,
+        status: applicationStatus,
+      })
       .eq('id', applicationId)
 
     if (errApp) {
@@ -27,14 +37,19 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString()
     const { error: errTx } = await supabaseAdmin
       .from('payment_transactions')
-      .update({ status: 'paid', paid_at: now, raw_provider_payload: body })
+      .update({ status: transactionStatus, paid_at: isPaid ? now : null, raw_provider_payload: body })
       .eq('application_id', applicationId)
 
     if (errTx) {
       // continuar aunque falle la actualización de transacción
     }
 
-    // 3) Recuperar datos de la aplicación para crear/actualizar membership y membership_period
+    // 3) Si no fue pago exitoso, no activar membresía.
+    if (!isPaid) {
+      return NextResponse.json({ success: true, message: 'Pago no aprobado. Solicitud mantenida en pendiente.' })
+    }
+
+    // 4) Recuperar datos de la aplicación para crear/actualizar membership y membership_period
     const { data: appRow, error: errGetApp } = await supabaseAdmin
       .from('applications')
       .select('id, entrepreneur_id, product_id, amount_cop')
@@ -60,7 +75,7 @@ export async function POST(request: NextRequest) {
     const startAt = now
     const endAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString()
 
-    // 4) Upsert membership
+    // 5) Upsert membership
     const { data: existingMembership } = await supabaseAdmin
       .from('memberships')
       .select('id')
@@ -78,7 +93,7 @@ export async function POST(request: NextRequest) {
         .insert({ entrepreneur_id: entrepreneurId, status: 'active', start_at: startAt, end_at: endAt, last_application_id: applicationId })
     }
 
-    // 5) Crear membership_periods
+    // 6) Crear membership_periods
     await supabaseAdmin.from('membership_periods').insert({
       entrepreneur_id: entrepreneurId,
       application_id: applicationId,

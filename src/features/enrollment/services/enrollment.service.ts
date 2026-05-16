@@ -31,6 +31,7 @@ type EnrollmentInput = {
   wompi_reference?: string | null
   wompi_status?: string | null
   payment_completed_at?: string | null
+  request_origin?: string
 }
 
 export const enrollmentService = {
@@ -215,7 +216,11 @@ export const enrollmentService = {
     })
 
     // Crear payment_transaction y generar checkout_url de Wompi
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+    const configuredBaseUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+    const requestOrigin = input.request_origin?.trim()
+    const baseUrl = configuredBaseUrl && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(configuredBaseUrl)
+      ? configuredBaseUrl
+      : (requestOrigin || 'http://localhost:3000')
     const redirectUrl = `${baseUrl}/inscripcion/confirmacion?applicationId=${encodeURIComponent(applicationId)}`
     const checkoutUrl = buildWompiCheckoutUrl({ reference: applicationId, amountCop: product.price_cop, redirectUrl })
 

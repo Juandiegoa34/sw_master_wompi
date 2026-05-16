@@ -27,6 +27,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Submissio
       post_screenshot: null,
       description_editorial_status: body.description_editorial_status ?? undefined,
       description_review_id: body.description_review_id ?? undefined,
+      request_origin: request.nextUrl.origin,
     })
 
     const status = result.success ? 200 : 400
